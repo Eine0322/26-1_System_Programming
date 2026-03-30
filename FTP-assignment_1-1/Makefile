@@ -1,10 +1,10 @@
 CC = gcc
-TARGET = kw학번_opt
+TARGET = kw2024402055_opt
 
 all: $(TARGET)
 
-$(TARGET): kw학번_opt.c
-	$(CC) -o $(TARGET) kw학번_opt.c
+$(TARGET): kw2024402055_opt.c
+	$(CC) -o $(TARGET) kw2024402055_opt.c
 
 clean:
 	rm -f $(TARGET)
