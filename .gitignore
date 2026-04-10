@@ -1,6 +1,7 @@
 *.*
 !*.c
 !*.pdf
+!*.txt
 !Makefile
 !*.gitignore
 !*.tar.gz

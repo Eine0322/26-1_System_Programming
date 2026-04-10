@@ -1,0 +1,6 @@
+Kwangwoon University
+System Programming
+2026 1st semester
+FTP SERVER - Assignment
+Student number : 2024402055
+put command
