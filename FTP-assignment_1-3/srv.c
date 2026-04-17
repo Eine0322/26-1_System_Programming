@@ -44,7 +44,8 @@ void execute_command(char *buffer)
     struct stat st;
 
     // ===================== command parsing =====================
-    cmd = strtok(buffer, " ");         // extract command
+    cmd = strtok(buffer, " ");
+    if (cmd == NULL) return;         // extract command
     arg = strtok(NULL, " ");           // extract argument
 
     ///////////////////////////////////////////////////////////////////////
@@ -216,6 +217,7 @@ void execute_command(char *buffer)
             opt_a = 1; opt_l = 1;
         }
 
+
         // -------- path validation --------
         if (stat(path, &st) == -1) {
             write(2, "Error: invalid path\n", 20);
@@ -239,6 +241,7 @@ void execute_command(char *buffer)
         // -------- read entries --------
         while ((entry = readdir(dp)) != NULL) {
             if (!opt_a && entry->d_name[0] == '.') continue;
+            if (count >= BUF_SIZE) break; // prevent overflow
             files[count++] = strdup(entry->d_name);
         }
 
@@ -396,7 +399,11 @@ int main()
     while (1) {
         memset(buffer, 0, BUF_SIZE);
 
-        read(STDIN_FILENO, buffer, BUF_SIZE); // read command
+        int n = read(STDIN_FILENO, buffer, BUF_SIZE); // read command
+        if (n == 0) break; // EOF
+        if (n < 0) continue;
+        
+        buffer[n] = '\0';                      // null-terminate
         buffer[strcspn(buffer, "\n")] = 0;    // remove newline
 
         execute_command(buffer);              // execute command
