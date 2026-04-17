@@ -6,8 +6,8 @@
 // Student ID : 2024402055
 // --------------------------------------------------------------------
 // Title : System Programming Assignment #1-3 (FTP client)
-// Description : This program implements a simple FTP client that converts user commands
-//               into corresponding FTP protocol commands. It handles various commands
+// Description : This program implements a simple FTP client that converts
+//               user commands into FTP protocol commands
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <unistd.h>
@@ -20,105 +20,140 @@
 // convert_command
 // ===================================================================
 // Input: int argc -> number of input arguments
-//        char *argv[] -> array of input arguments (user command)
-//        char *buffer -> buffer to store the converted FTP command
-// Output: void -> the converted command is stored in the buffer
-// Purpose: To convert user commands into corresponding FTP protocol commands
+//        char *argv[] -> user command arguments
+//        char *buffer -> buffer to store FTP command
+// Output: void
+// Purpose: convert user command into corresponding FTP protocol command
 ///////////////////////////////////////////////////////////////////////////////////////
 void convert_command(int argc, char *argv[], char *buffer)
 {
-    // Check if any command is provided
+    // ===================== argument validation =====================
     if (argc < 2) {
         write(2, "Error: No command\n", 18);
         exit(1);
     }
 
-    // ls
+    ///////////////////////////////////////////////////////////////////////
+    // ls → NLST
+    ///////////////////////////////////////////////////////////////////////
     if (strcmp(argv[1], "ls") == 0) {
+
         strcpy(buffer, "NLST");
+
+        // append options and path if exist
         if (argc >= 3) {
-            strcat(buffer, " ");
-            strcat(buffer, argv[2]);
+            for (int i = 2; i < argc; i++) {
+                strcat(buffer, " ");
+                strcat(buffer, argv[i]);
+            }
         }
     }
 
-    // dir
+    ///////////////////////////////////////////////////////////////////////
+    // dir → LIST
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "dir") == 0) {
+
         strcpy(buffer, "LIST");
+
+        // append argument (directory path)
         if (argc >= 3) {
             strcat(buffer, " ");
             strcat(buffer, argv[2]);
         }
     }
 
-    // pwd
+    ///////////////////////////////////////////////////////////////////////
+    // pwd → PWD
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "pwd") == 0) {
         strcpy(buffer, "PWD");
     }
 
-    // cd
+    ///////////////////////////////////////////////////////////////////////
+    // cd → CWD / CDUP
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "cd") == 0) {
-        if (argc < 3) { // check if directory name is provided
+
+        if (argc < 3) {
             write(2, "Error: No directory name\n", 25);
             exit(1);
         }
 
-        if (strcmp(argv[2], "..") == 0) { // handle cd .. case
+        // cd ..
+        if (strcmp(argv[2], "..") == 0) {
             strcpy(buffer, "CDUP");
-        } else { // handle cd <dir> case
+        }
+        // cd <dir>
+        else {
             strcpy(buffer, "CWD ");
             strcat(buffer, argv[2]);
         }
     }
 
-    // mkdir
+    ///////////////////////////////////////////////////////////////////////
+    // mkdir → MKD
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "mkdir") == 0) {
-        if (argc < 3) { // check if directory name is provided
+
+        if (argc < 3) {
             write(2, "Error: No directory name\n", 25);
             exit(1);
         }
 
         strcpy(buffer, "MKD");
-        // concatenate all directory names if multiple are provided
+
+        // support multiple directory names
         for (int i = 2; i < argc; i++) {
             strcat(buffer, " ");
             strcat(buffer, argv[i]);
         }
     }
 
-    // delete
+    ///////////////////////////////////////////////////////////////////////
+    // delete → DELE
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "delete") == 0) {
-        if (argc < 3) { // check if file name is provided
+
+        if (argc < 3) {
             write(2, "Error: No file name\n", 20);
             exit(1);
         }
 
         strcpy(buffer, "DELE");
-        // concatenate all file names if multiple are provided
+
+        // support multiple file names
         for (int i = 2; i < argc; i++) {
             strcat(buffer, " ");
             strcat(buffer, argv[i]);
         }
     }
 
-    // rmdir
+    ///////////////////////////////////////////////////////////////////////
+    // rmdir → RMD
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "rmdir") == 0) {
-        if (argc < 3) { // check if directory name is provided
+
+        if (argc < 3) {
             write(2, "Error: No directory name\n", 25);
             exit(1);
         }
 
         strcpy(buffer, "RMD");
-        // concatenate all directory names if multiple are provided
+
+        // support multiple directory names
         for (int i = 2; i < argc; i++) {
             strcat(buffer, " ");
             strcat(buffer, argv[i]);
         }
     }
 
-    // rename
+    ///////////////////////////////////////////////////////////////////////
+    // rename → RNFR / RNTO
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "rename") == 0) {
-        if (argc < 4) { // check if old and new file names are provided
+
+        if (argc < 4) {
             write(2, "Error: usage rename <old> <new>\n", 32);
             exit(1);
         }
@@ -130,9 +165,12 @@ void convert_command(int argc, char *argv[], char *buffer)
         strcat(buffer, argv[3]);
     }
 
-    // get
+    ///////////////////////////////////////////////////////////////////////
+    // get → RETR
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "get") == 0) {
-        if (argc < 3) { // check if file name is provided
+
+        if (argc < 3) {
             write(2, "Error: No file name\n", 20);
             exit(1);
         }
@@ -141,9 +179,12 @@ void convert_command(int argc, char *argv[], char *buffer)
         strcat(buffer, argv[2]);
     }
 
-    // put
+    ///////////////////////////////////////////////////////////////////////
+    // put → STOR
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "put") == 0) {
-        if (argc < 3) { // check if file name is provided
+
+        if (argc < 3) {
             write(2, "Error: No file name\n", 20);
             exit(1);
         }
@@ -152,11 +193,16 @@ void convert_command(int argc, char *argv[], char *buffer)
         strcat(buffer, argv[2]);
     }
 
-    // quit
+    ///////////////////////////////////////////////////////////////////////
+    // quit → QUIT
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(argv[1], "quit") == 0) {
         strcpy(buffer, "QUIT");
     }
 
+    ///////////////////////////////////////////////////////////////////////
+    // unknown command
+    ///////////////////////////////////////////////////////////////////////
     else {
         write(2, "Error: Unknown command\n", 23);
         exit(1);
@@ -166,18 +212,19 @@ void convert_command(int argc, char *argv[], char *buffer)
 ///////////////////////////////////////////////////////////////////////////////////////
 // main
 // ===================================================================
-// Input: int argc -> number of input arguments
-//        char *argv[] -> array of input arguments (user command)
-// Output: int -> returns 0 when program terminates normally
-// Purpose: To process user commands and communicate with the FTP server
+// Input: int argc, char *argv[]
+// Output: int
+// Purpose: convert command and send to server (stdout)
 ///////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-    char buffer[BUF_SIZE] = {0}; // buffer to store the converted FTP command
+    char buffer[BUF_SIZE] = {0}; // buffer for FTP command
 
-    convert_command(argc, argv, buffer); // convert user command to FTP command
+    // -------- convert command --------
+    convert_command(argc, argv, buffer);
 
-    write(STDOUT_FILENO, buffer, strlen(buffer)); // print the converted command to standard output
+    // -------- send command --------
+    write(STDOUT_FILENO, buffer, strlen(buffer));
 
     return 0;
 }

@@ -1,12 +1,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 // File Name : srv.c
-// Date : 2026/04/10
+// Date : 2026/04/17
 // OS : Ubuntu 20.04.6 LTS 64bits
 // Author : Park Hyun-ji
 // Student ID : 2024402055
 // --------------------------------------------------------------------
 // Title : System Programming Assignment #1-3 (FTP server)
-// Description : This program implements a simple FTP server that handles FTP protocol commands
+// Description : This program implements a simple FTP server
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <stdio.h>
@@ -15,185 +15,365 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #define BUF_SIZE 1024
 
+///////////////////////////////////////////////////////////////////////////////////////
+// write_str
+// ===================================================================
+// Input: const char *str -> string to print
+// Output: void
+// Purpose: print string using write system call
+///////////////////////////////////////////////////////////////////////////////////////
+void write_str(const char *str) {
+    write(STDOUT_FILENO, str, strlen(str));
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// execute_command
+// ===================================================================
+// Input: char *buffer -> command string from client
+// Output: void
+// Purpose: parse and execute FTP commands
+///////////////////////////////////////////////////////////////////////////////////////
 void execute_command(char *buffer)
 {
     char *cmd;
     char *arg;
-
     struct stat st;
 
-    cmd = strtok(buffer, " ");
-    arg = strtok(NULL, " ");
+    // ===================== command parsing =====================
+    cmd = strtok(buffer, " ");         // extract command
+    arg = strtok(NULL, " ");           // extract argument
 
-    // =========================
-    // PWD
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // PWD : print working directory
+    ///////////////////////////////////////////////////////////////////////
     if (strcmp(cmd, "PWD") == 0) {
+
         char cwd[BUF_SIZE];
 
-        if (getcwd(cwd, sizeof(cwd)) == NULL) {
-            perror("PWD error");
+        if (getcwd(cwd, sizeof(cwd)) == NULL) { // get current directory
+            write(2, "PWD error\n", 10);
             return;
         }
 
-        write(STDOUT_FILENO, cwd, strlen(cwd));
-        write(STDOUT_FILENO, "\n", 1);
+        write_str(cwd);   // print directory
+        write_str("\n");
     }
 
-    // =========================
-    // CWD
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // CWD : change directory
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "CWD") == 0) {
-        if (arg == NULL) { // check if directory name is provided
+
+        if (arg == NULL) { // check argument
             write(2, "Error: No directory name\n", 25);
             return;
         }
 
-        if (chdir(arg) == -1) { // check if directory name is provided and change directory
-            perror("CWD error");
-            return;
+        if (chdir(arg) == -1) { // change directory
+            write(2, "CWD error\n", 10);
         }
     }
 
-    // =========================
-    // CDUP
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // CDUP : move to parent directory
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "CDUP") == 0) {
+
         if (chdir("..") == -1) {
-            perror("CDUP error");
-            return;
+            write(2, "CDUP error\n", 11);
         }
     }
 
-    // =========================
-    // MKD
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // MKD : create directory
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "MKD") == 0) {
-         if (arg == NULL) {
+
+        if (arg == NULL) {
             write(2, "Error: missing argument\n", 23);
             return;
         }
 
         while (arg != NULL) {
-            if (mkdir(arg, 0755) == -1) {
-                perror("MKD error");
+            if (mkdir(arg, 0755) == -1) { // create directory
+                write(2, "MKD error\n", 10);
             }
             arg = strtok(NULL, " ");
         }
     }
 
-    // =========================
-    // DELE
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // DELE : delete file
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "DELE") == 0) {
+
         if (arg == NULL) {
             write(2, "Error: missing argument\n", 23);
             return;
         }
 
         while (arg != NULL) {
-            if (stat(arg, &st) == -1) {
-                perror("stat error");
+
+            if (stat(arg, &st) == -1) { // check file
+                write(2, "stat error\n", 11);
             }
-            else if (S_ISDIR(st.st_mode)) {
-                write(2, "Error: cannot delete a directory\n", 32);
+            else if (S_ISDIR(st.st_mode)) { // if directory → error
+                write(2, "Error: cannot delete directory\n", 31);
             }
             else {
-                if (remove(arg) == -1) {
-                    perror("DELE error");
+                if (remove(arg) == -1) { // remove file
+                    write(2, "DELE error\n", 11);
                 }
             }
             arg = strtok(NULL, " ");
         }
     }
 
-    // =========================
-    // RMD
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // RMD : remove directory
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "RMD") == 0) {
+
         if (arg == NULL) {
             write(2, "Error: missing argument\n", 23);
             return;
         }
 
         while (arg != NULL) {
+
             if (stat(arg, &st) == -1) {
-                perror("stat error");
+                write(2, "stat error\n", 11);
             }
-            else if(!S_ISDIR(st.st_mode)) {
-                write(2, "Error: cannot remove a file\n", 27);
+            else if (!S_ISDIR(st.st_mode)) { // not directory
+                write(2, "Error: not directory\n", 21);
             }
             else {
-                if (rmdir(arg)== -1) {
-                    perror("RMD error");
+                if (rmdir(arg) == -1) { // remove directory
+                    write(2, "RMD error\n", 10);
                 }
             }
             arg = strtok(NULL, " ");
         }
     }
 
-    // =========================
-    // RNFR + RNTO
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // RNFR / RNTO : rename file
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "RNFR") == 0) {
-        if (arg == NULL) { // none A
-            write(2, "Error: missing old name argument\n", 31);
+
+        char *old = arg;                     // old name
+        char *rnto = strtok(NULL, " ");      // should be RNTO
+        char *new = strtok(NULL, " ");       // new name
+
+        if (old == NULL || rnto == NULL || new == NULL || strcmp(rnto, "RNTO") != 0) {
+            write(2, "Error: RNFR syntax\n", 19);
             return;
         }
-        else {
-            char* old = arg;
-            strtok(NULL, " "); // skip "RNTO"
-            char* new = strtok(NULL, " ");
-            if (new == NULL) { // none B
-                write(2, "Error: missing new name argument\n", 31);
-                return;
-            }
-            else if (rename(old, new) == -1) {
-                perror("RNFR/RNTO error");
-                return;
-            }
-        }   
+
+        if (rename(old, new) == -1) {
+            write(2, "rename error\n", 13);
+        }
     }
 
-    // =========================
-    // NLST / LIST
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // NLST / LIST : list directory
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "NLST") == 0 || strcmp(cmd, "LIST") == 0) {
 
         DIR *dp;
         struct dirent *entry;
 
-        // TODO
-        // opendir(arg1 or ".")
-        // readdir 반복 출력
-        // LIST는 자세히, NLST는 이름만 (간단히 이름만 해도 됨)
+        char *files[BUF_SIZE];
+        int count = 0;
+
+        int opt_a = 0, opt_l = 0;
+        char *path = ".";
+
+        // -------- option parsing --------
+        while (arg != NULL) {
+
+            if (arg[0] == '-') {
+                if (strcmp(arg, "-a") == 0) opt_a = 1;
+                else if (strcmp(arg, "-l") == 0) opt_l = 1;
+                else if (strcmp(arg, "-al") == 0 || strcmp(arg, "-la") == 0) {
+                    opt_a = 1; opt_l = 1;
+                }
+                else {
+                    write(2, "Error: invalid option\n", 22);
+                    return;
+                }
+            } else {
+                path = arg; // directory path
+            }
+            arg = strtok(NULL, " ");
+        }
+
+        if (strcmp(cmd, "LIST") == 0) { // LIST = -al
+            opt_a = 1; opt_l = 1;
+        }
+
+        // -------- path validation --------
+        if (stat(path, &st) == -1) {
+            write(2, "Error: invalid path\n", 20);
+            return;
+        }
+
+        // -------- file case --------
+        if (!S_ISDIR(st.st_mode)) {
+            write_str(path);
+            write_str("\n");
+            return;
+        }
+
+        // -------- open directory --------
+        dp = opendir(path);
+        if (dp == NULL) {
+            write(2, "Error: cannot open directory\n", 29);
+            return;
+        }
+
+        // -------- read entries --------
+        while ((entry = readdir(dp)) != NULL) {
+            if (!opt_a && entry->d_name[0] == '.') continue;
+            files[count++] = strdup(entry->d_name);
+        }
+
+        closedir(dp);
+
+        // -------- sort (ASCII) --------
+        for (int i = 0; i < count - 1; i++) {
+            for (int j = i + 1; j < count; j++) {
+                if (strcmp(files[i], files[j]) > 0) {
+                    char *tmp = files[i];
+                    files[i] = files[j];
+                    files[j] = tmp;
+                }
+            }
+        }
+
+        // -------- print --------
+        int printed = 0;
+
+        for (int i = 0; i < count; i++) {
+
+            char fullpath[BUF_SIZE];
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", path, files[i]);
+
+            if (stat(fullpath, &st) == -1) continue;
+
+            char name[BUF_SIZE];
+            strcpy(name, files[i]);
+
+            if (S_ISDIR(st.st_mode)) strcat(name, "/");
+
+            if (opt_l) {
+                write_str(name);
+                write_str("\n");
+            }
+            else {
+                char buf[BUF_SIZE];
+                snprintf(buf, sizeof(buf), "%-20s", name);
+                write_str(buf);
+
+                printed++;
+                if (printed % 5 == 0) write_str("\n");
+            }
+        }
+
+        if (!opt_l && printed % 5 != 0) write_str("\n");
+
+        for (int i = 0; i < count; i++) free(files[i]);
     }
 
-    // =========================
-    // RETR (get)
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // RETR : get file (server → client)
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "RETR") == 0) {
 
-        // TODO (간단 버전)
-        // 파일 존재 확인만 해도 충분한 과제 많음
+        if (arg == NULL) {
+            write(2, "Error: No file name\n", 20);
+            return;
+        }
+
+        char src[BUF_SIZE], dst[BUF_SIZE];
+        snprintf(src, sizeof(src), "server_root/%s", arg);
+        snprintf(dst, sizeof(dst), "client_root/%s", arg);
+
+        int fd_src = open(src, O_RDONLY);           // open source file
+        if (fd_src < 0) {
+            write(2, "Error: file not found\n", 22);
+            return;
+        }
+
+        int fd_dst = open(dst, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd_dst < 0) {
+            write(2, "Error: cannot create file\n", 26);
+            close(fd_src);
+            return;
+        }
+
+        char buf[BUF_SIZE];
+        int n;
+
+        while ((n = read(fd_src, buf, BUF_SIZE)) > 0) {
+            write(fd_dst, buf, n);   // copy data
+        }
+
+        close(fd_src);
+        close(fd_dst);
+
+        write_str("RETR success\n");
     }
 
-    // =========================
-    // STOR (put)
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // STOR : put file (client → server)
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "STOR") == 0) {
 
-        // TODO (간단 버전)
-        // 파일 생성 정도만
+        if (arg == NULL) {
+            write(2, "Error: No file name\n", 20);
+            return;
+        }
+
+        char src[BUF_SIZE], dst[BUF_SIZE];
+        snprintf(src, sizeof(src), "client_root/%s", arg);
+        snprintf(dst, sizeof(dst), "server_root/%s", arg);
+
+        int fd_src = open(src, O_RDONLY);
+        if (fd_src < 0) {
+            write(2, "Error: file not found\n", 22);
+            return;
+        }
+
+        int fd_dst = open(dst, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd_dst < 0) {
+            write(2, "Error: cannot create file\n", 26);
+            close(fd_src);
+            return;
+        }
+
+        char buf[BUF_SIZE];
+        int n;
+
+        while ((n = read(fd_src, buf, BUF_SIZE)) > 0) {
+            write(fd_dst, buf, n);
+        }
+
+        close(fd_src);
+        close(fd_dst);
+
+        write_str("STOR success\n");
     }
 
-    // =========================
-    // QUIT
-    // =========================
+    ///////////////////////////////////////////////////////////////////////
+    // QUIT : terminate server
+    ///////////////////////////////////////////////////////////////////////
     else if (strcmp(cmd, "QUIT") == 0) {
+        write_str("QUIT\n");
         exit(0);
     }
 
@@ -202,6 +382,13 @@ void execute_command(char *buffer)
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////
+// main
+// ===================================================================
+// Input: none
+// Output: int
+// Purpose: receive command and execute repeatedly
+///////////////////////////////////////////////////////////////////////////////////////
 int main()
 {
     char buffer[BUF_SIZE];
@@ -209,13 +396,10 @@ int main()
     while (1) {
         memset(buffer, 0, BUF_SIZE);
 
-        // 👉 cli에서 넘어온 명령 입력받는다고 가정
-        read(STDIN_FILENO, buffer, BUF_SIZE);
+        read(STDIN_FILENO, buffer, BUF_SIZE); // read command
+        buffer[strcspn(buffer, "\n")] = 0;    // remove newline
 
-        // 개행 제거
-        buffer[strcspn(buffer, "\n")] = 0;
-
-        execute_command(buffer);
+        execute_command(buffer);              // execute command
     }
 
     return 0;
